@@ -1,0 +1,134 @@
+import logging
+from .spider import StockInfo
+from ggd.database.sessionFactory import MySQLSessionFactory
+from ggd.util.ggdUtil import Profiler
+from ggd.util.ggdUtil import FinanceDateUtil
+from datetime import datetime 
+import time
+import calendar
+import ggd.finance.dao
+from ggd.finance.models import TWSEStkQuote
+import sys
+
+class FunctionalService:
+
+    log = logging.getLogger()
+    gdo = None    
+    TWSE_QUOTE_START_YEAR = 1992
+    TWSE_QUOTE_DELAY_SECOND = 10
+
+    def __init__(self, gdo):
+        self.gdo = gdo        
+
+
+    def ReverseQuoteFromYahoo(self, stk_id = None):
+        p = Profiler()
+        self.log.info("[START] {cn}.ReverseQuoteFromYahoo(), stk_id: {sn}".format(cn = type(self).__name__, sn = stk_id))
+        now = datetime.now()                                        
+        stks = self.gdo.Get_Stock(stk_id)
+        now = datetime.now().strftime("%Y%m%d")
+        for stk in stks:
+            
+            si = StockInfo(stk["STOCK_ID"])
+            
+
+        self.log.info("[END] {cn}.ReverseQuoteFromYahoo(), exec TIME: {t} ms.,stk_id: {sn}".format(cn = type(self).__name__, sn = stk_id, t = p.executeTime()))
+    '''
+    回補報價資料
+    '''
+    def ReverseQuote(self, stk_id = None):
+        p = Profiler()
+        self.log.info("[START] {cn}.ReverseQuote(), stk_id: {sn}".format(cn = type(self).__name__, sn = stk_id))
+        
+        def cb(id, quotes):
+            self.log.info("[START] {cn}.ReverseQuote() inner callback, quotes count: {c}".format(cn = type(self).__name__, c = len(quotes)))
+            beans = {}
+            try:
+                for q in quotes:
+                    sp = q["date"].split("/")
+                    y = int(sp[0]) + 1911
+                    m = sp[1]
+                    d = sp[2]
+                    qdate = datetime.strptime("{y}-{m}-{d}".format(y = y, m = m, d = d), "%Y-%m-%d")
+                    self.log.debug("stkid: {id}, qdate: {qd}, open: {o}, high: {h}, low: {l}, close: {c}, p_distance: {ac}, volumn: {v}".format(id = id, qd = qdate, o = q["open"], h = q["high"], l = q["low"], c = q["close"], ac = q["p_distance"], v = q["volumn"].replace(",", "")))                
+                    vo = TWSEStkQuote(
+                            STK_ID = id,
+                            Q_DATE = qdate,
+                            OPEN = float(q["open"]),
+                            HIGH = float(q["high"]),
+                            LOW = float(q["low"]),
+                            CLOSE = float(q["close"]),
+                            P_DISTANCE = float(q["p_distance"]),
+                            VOLUMN = int(q["volumn"].replace(",", "")),
+                            TOTAL_COUNT = int(q["total_count"].replace(",", "")),
+                            TOTAL_PRICE = int(q["price"].replace(",", "")),
+                    )
+                    
+                    beans[vo.STK_ID + "_" + vo.Q_DATE.strftime("%Y%m%d")] = vo
+
+                vos = beans.values()
+                self.log.debug("vos counts: {c}".format(c = len(vos)))
+                
+                self.gdo.saveBeans(vos)
+                self.log.debug("save quote complete.")
+            except TypeError as te:
+                self.log.error(te)
+            except ValueError as ve:
+                self.log.error(ve)
+            except:
+                print(sys.exc_info()[0])
+
+        now = datetime.now()                                        
+        stks = self.gdo.Get_Stock(stk_id)
+        for stk in stks:
+            stk_id = stk["STOCK_ID"]
+            self.log.debug("STK_ID: " + stk_id)
+            rs = self.gdo.Get_Last_Quote_Date(stk_id)                        
+            firstObj = rs.fetchone()
+            ym = ""
+            startYear = 0
+            startMonth = 1
+            if firstObj is None:
+                #表示db內無報價資料，從上市時間開始抓
+                y = stk["LIST_DATE"].strftime("%Y")
+                if int(y) < self.TWSE_QUOTE_START_YEAR:
+                    y = str(self.TWSE_QUOTE_START_YEAR)
+                m = stk["LIST_DATE"].strftime("%m")
+                ym = y + m
+                startYear = int(y)
+                startMonth = int(m)
+            else:
+                y = firstObj["QUOTE_DATE"].strftime("%Y")
+                m = firstObj["QUOTE_DATE"].strftime("%m")
+                d = firstObj["QUOTE_DATE"].strftime("%d")
+                fdutil = FinanceDateUtil()
+                if fdutil.isLastMonthDay(int(y), int(m), int(d)) is False:
+                    ym = y + m
+                else:
+                    if m == "12":
+                        y = str(int(y) + 1)
+                        m = "01"
+                    else:
+                        m = str(int(m) + 1)
+                    ym = y + m
+                    startYear = int(y)       
+                    startMonth = int(m)         
+            
+            
+            nowYear = int(now.strftime("%Y"))
+            for y in range(startYear, nowYear):                
+                for m in range(startMonth % 12, 13):
+                    ym = str(y) + "{:02d}".format(m)                    
+                    si = StockInfo(stk_id)
+                    si.Get_Quote_from_TWSE(ym, cb)
+                    time.sleep(self.TWSE_QUOTE_DELAY_SECOND)
+                startMonth = 1
+                                
+        self.log.info("[END] {cn}.ReverseQuote(), exec TIME: {t}, stk_id: {sn}".format(cn = type(self).__name__, t = p.executeTime(), sn = stk_id))
+
+
+
+    
+
+
+        
