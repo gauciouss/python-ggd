@@ -64,11 +64,8 @@ class FunctionalService:
 
             id, qs = si.GetQuote_from_Yahoo(start, end)
             if qs is None:
-                continue                    
-
-            lastDateQuote = "select * from TW_STOCK_QUOTE where stk_id = {stk} and q_date = (select max(q_date) from TW_STOCK_QUOTE where stk_id = {stk})".format(stk = id)
-
-            
+                #Yahoo中唔該檔股票
+                continue
 
             beans = []            
             for q in qs:
