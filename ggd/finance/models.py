@@ -8,7 +8,7 @@ base = declarative_base()
 #Yahoo盤後報價
 class TWStockQuote(base):
     __table_args__ = {'extend_existing': True}
-    __tablename__ = 'TW_STOCK_QUOTE'
+    __tablename__ = 'tw_stock_quote'
     stk_id = Column(String(20), primary_key = True)
     q_date = Column(Date, primary_key = True)
     open = Column(Float)
@@ -16,19 +16,11 @@ class TWStockQuote(base):
     low = Column(Float)
     close = Column(Float)
     volumn = Column(BIGINT) #成交股數    
+    updown = Column(INT)    #漲跌
+    updown_limit = Column(Float)    #漲跌幅
+    A = Column(Float)
+    ewma = Column(Float)
 
-class ViewTWStockQuote(base):
-    __table_args__ = {'extend_existing': True}
-    __tablename__ = 'view_tw_stock_quote'
-    stk_id = Column(String(20), primary_key = True)
-    q_date = Column(Date, primary_key = True)
-    open = Column(Float)
-    high = Column(Float)
-    low = Column(Float)
-    close = Column(Float)
-    volumn = Column(BIGINT) #成交股數
-    updown = Column(BIGINT) #漲跌
-    updown_limit = Column(BIGINT) #漲跌幅
 
 #TWSE盤後報價
 class TWSEStkQuote(base):

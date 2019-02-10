@@ -55,7 +55,7 @@ class GGDDao:
     def Get_Last_Quote(self, stk_id):
         p = Profiler()
         self.log.info("[START] {cname}.Get_Last_Quote(), stk_no: {sn}".format(cname = type(self).__name__, sn = stk_id))        
-        sql = "select * from TW_STOCK_QUOTE where stk_id = {stk} and q_date = (select max(q_date) from TW_STOCK_QUOTE where stk_id = {stk}) ".format(stk = stk_id)        
+        sql = "select * from tw_stock_quote where stk_id = {stk} and q_date = (select max(q_date) from tw_stock_quote where stk_id = {stk}) ".format(stk = stk_id)        
         self.log.debug("query last date sql: " + sql)
         session = self.sessionFactory.GetSession()
         stk_list = session.execute(sql)
@@ -72,7 +72,7 @@ class GGDDao:
     def Get_Quotes(self, start, end, stk_id = None):
         p = Profiler()        
         self.log.info("[START] {cn}.Get_Quotes(), start: {st}, end: {et}, stk_id: {s}".format(cn = type(self).__name__, st = start, et = end, s = stk_id))
-        sql = "select * from view_tw_stock_quote where q_date between {s} and {e} "
+        sql = "select * from tw_stock_quote where q_date between {s} and {e} "
         
         if stk_id is not None:
             s = ""
