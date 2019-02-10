@@ -38,5 +38,3 @@ sessionFactory = MySQLSessionFactory(sql_cfg)
 dao = gdo(sessionFactory) 
 service = FunctionalService(dao)
 service.ReverseQuote();
-
-

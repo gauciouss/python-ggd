@@ -11,7 +11,7 @@ class Mytest(unittest.TestCase):
 
 
 
-        #loggin 設定
+    #loggin 設定
     logging.basicConfig(level=logging.DEBUG,
         #format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
         format = "[level:%(levelname)s-file:%(filename)s-lineno:%(lineno)d] %(asctime)s %(message)s",
@@ -69,16 +69,73 @@ class Mytest(unittest.TestCase):
             for sql in sqls:
                 f.write(sql)
                 f.write("\n")
+    
 
     def test_get_all_quotes(self):
         sessionFactory = MySQLSessionFactory(self.sql_cfg)
         dao = gdo(sessionFactory) 
         ls = dao.Get_Quotes(start = "20190101", end = "20190110")
-        for stk in ls:
-            print(stk)
+        return ls
 
+    def test_get_all_stk(self, callback):
+        sessionFactory = MySQLSessionFactory(self.sql_cfg)
+        sql = "select distinct stk_id from tw_stock_quote"
+        session = sessionFactory.GetSession()
+        ls = session.execute(sql)
+        for obj in ls:
+            #self.test_get_first_quote(obj["stk_id"])
+            callback(obj["stk_id"])
+
+
+    def test_get_first_quote(self, stk_id):
+        sessionFactory = MySQLSessionFactory(self.sql_cfg)
+        sql = "select stk_id, q_date from tw_stock_quote where q_date = (select min(q_date) from tw_stock_quote where stk_id = '{stk_id}') and stk_id = '{stk_id}'"
+        sql = sql.format(stk_id = stk_id)
+        session = sessionFactory.GetSession()
+        ls = session.execute(sql)
+        
+        for obj in ls:
+            #print(obj["q_date"])
+            sql2 = "update tw_stock_quote set A = pow(updown_limit, 2) * 0.06 where stk_id = '{stk_id}' and q_date = '{qd}'"
+            sql2 = sql2.format(stk_id = stk_id, qd = obj["q_date"])            
+            session.execute(sql2)
+            session.commit()
+        session.close()
+            
+
+    def test_calcute_ewma(self, stk_id):
+        sessionFactory = MySQLSessionFactory(self.sql_cfg)
+        session = sessionFactory.GetSession()
+        sql = "select * from tw_stock_quote where stk_id = '{stk_id}' order by q_date"
+        sql = sql.format(stk_id = stk_id)
+        ls = session.execute(sql)
+        i = 1
+        A = 0
+        for obj in ls:
+            id = obj["stk_id"]
+            qd = obj["q_date"]
+            if i == 1:
+                A = obj["A"]                
+                i = i + 1
+            else:
+                rate = obj["updown_limit"]
+                A = self.A(rate, A)
+
+            ewma = pow(A * 250, 0.5)    
+
+            sql2 = "update tw_stock_quote set A = {A}, ewma = {ewma} where stk_id = '{id}' and q_date = '{qd}'"
+            sql2 = sql2.format(A = A, ewma = ewma, id = id, qd = qd)
+            session.execute(sql2)
+            session.commit()
+            
+
+
+            
     
         
+    def A(self, r, xi):
+        a = pow(r, 2) * 0.06 + xi * (1-0.06)        
+        return a
 
                 
 
@@ -90,15 +147,4 @@ class Mytest(unittest.TestCase):
 
 
 mt = Mytest()
-#mt.parseListCSV()
-#print(dt.now().strftime("%m"))
-#print("{:02d}".format(1))
-
-#si = StockInfo("2330")
-#qs = si.GetQuote_from_Yahoo("20181201", "20181231")
-#for q in qs:
-    #print(q["date"]) 
-
-
-mt.test_get_all_quotes()
-
+mt.test_get_all_stk(mt.test_calcute_ewma)
