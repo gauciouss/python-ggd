@@ -90,7 +90,35 @@ class GGDDao:
         self.log.info("[END] {cn}.GetQuotes(), exec TIME: {t} ms, start: {st}, end: {et}, stk_id: {stk}".format(cn = type(self).__name__, st = start, et = end, stk = stk_id, t = p.executeTime()))
         return ls
 
+    '''
+    取出尚未計算ewma的商品
+    @param stk_id 股票代號
+    '''
+    def Get_Noncalcute_EWMA(self, stk_id):
+        p = Profiler()
+        self.log.info("[START] {cn}.Get_Noncalcute_EWMA(), stk_id: {id}".format(cn = type(self).__name__), id = stk_id)
+        sql = "select * from tw_stock_quote where stk_id = '{id}' ewma is null"
+        sql = sql.format(id = stk_id)
+        session = self.sessionFactory.GetSession()
+        ls = session.execute(sql)
+        session.close()
+        self.log.info("[END] {cn}.Get_Noncalcute_EWMA(), exec TIME: {t} ms, stk_id: {id}".format(cn = type(self).__name__, t = p.executeTime(), id = stk_id))
+        return ls
 
+    '''
+    取出最後一筆已計算ewma的資料
+    @param stk_id 股票代號
+    '''
+    def Get_Last_EWMA(self, stk_id):
+        p = Profiler()
+        self.log.info("[START] {cn}.Get_Last_EWMA(), stk_id: {id}".format(cn = type(self).__name__, id = stk_id))
+        sql = "select * from tw_stock_quote where stk_id = '{id}' and ewma is not null order by q_date desc limit 1"
+        sql = sql.format(id = stk_id)
+        session = self.sessionFactory.GetSession()
+        rs = session.execute(sql).fetchone()
+        session.close()
+        self.log.info("[END] {cn}.Get_Last_EWMA(), ")
+        return rs
         
         
 
