@@ -17,9 +17,9 @@ class TWStockQuote(base):
     close = Column(Float)
     volumn = Column(BIGINT) #成交股數    
     updown = Column(INT)    #漲跌
-    updown_limit = Column(Float)    #漲跌幅
-    A = Column(Float)
+    updown_limit = Column(Float)    #漲跌幅    
     ewma = Column(Float)
+    A = Column(Float)
 
 
 #TWSE盤後報價

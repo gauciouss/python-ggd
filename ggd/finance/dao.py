@@ -2,7 +2,6 @@ import logging
 from .spider import StockInfo
 from ggd.database.sessionFactory import MySQLSessionFactory
 from ggd.util.ggdUtil import Profiler
-from ggd.finance.models import TWSEStkQuote
 import datetime
 import calendar
 
@@ -27,6 +26,34 @@ class GGDDao:
         finally:
             session.close()
         self.log.info("[END] {cn}.saveBeans(), exec TIME: {t} ms.".format(cn = type(self).__name__, t = p.executeTime()))
+
+    def updateBeans(self, key, value):
+        p = Profiler()
+        self.log.info("[START] {cn}.updateBeans()".format(cn = type(self).__name__))
+        session = None
+        try:
+            session = self.sessionFactory.GetSession()
+            #TODO 更新資料 
+            session.filter(key).update(value)
+            session.commit()
+        except Exception as e:
+            self.log.error(str(e))
+        finally:
+            session.close()
+
+        self.log.info("[END] {cn}.updateBeans(), exec TIME: {t} ms.".format(cn = type(self).__name__, t = p.executeTime()))
+
+    def update_updown_value(self, stk_id, q_date, updown, updown_limit):
+        p = Profiler()
+        self.log.info("[START] {cn}.update_updown_value(), stk_id: {id}, q_date: {qd}, updown: {u}, updown_limit: {ul}".format(cn = type(self).__name__, id = stk_id, qd = q_date, u = updown,  ul = updown_limit))
+        sql = "update tw_stock_quote set updown = {u}, updown_limit = {ul} where stk_id = '{id}' and q_date = '{qd}'".format(u = updown, ul = updown_limit, id = stk_id, qd = q_date) 
+        self.log.debug("update updown sql: " + sql)
+        session = self.sessionFactory.GetSession()
+        session.execute(sql)
+        session.commit()
+        session.close()
+        self.log.info("[end] {cn}.update_updown_value(), stk_id: {id}, q_date: {qd}, updown: {u}, updown_limit: {ul}, exec TIME: {t}".format(cn = type(self).__name__, id = stk_id, qd = q_date, u = updown,  ul = updown_limit, t = p.executeTime()))
+        pass
     
     '''
     取得證券商品資訊
@@ -36,9 +63,9 @@ class GGDDao:
         p = Profiler()
         self.log.info("[START] {cname}.Get_Stock(), stk_id: {stk_id}".format(cname = type(self).__name__, stk_id = stk_id))
         
-        sql = "select * from TW_STOCK_LIST"        
+        sql = "select distinct a.* from TW_STOCK_LIST a inner join tw_stock_quote b on a.STOCK_ID = b.stk_id"        
         if stk_id is not None:
-            sql = sql + (" where STOCK_ID = " + stk_id)
+            sql = sql + (" where a.STOCK_ID = " + stk_id)
         
         self.log.debug("exec sql statement: {sql}".format(sql = sql));
         session = self.sessionFactory.GetSession()
@@ -62,6 +89,33 @@ class GGDDao:
         session.close()
         self.log.info("[END] {cname}.Get_Last_Quote(), exec TIME: {t} ms., stk_no: {sn}".format(cname = type(self).__name__, t = p.executeTime(), sn = stk_id))
         return stk_list
+
+    
+    '''
+    取出尚未計算漲跌的資料
+    @param stk_id: 股票代碼
+    '''
+    def Get_Uncalcute_Updown(self, stk_id):
+        p = Profiler()
+        self.log.info("[START] {cn}.Calcute_UpDown(), stk_id: {id}".format(cn = type(self).__name__, id = stk_id))
+        sql1 = "select * from tw_stock_quote where stk_id = '{id}' and updown is null order by q_date".format(id = stk_id)        
+        session = self.sessionFactory.GetSession()
+        ls = session.execute(sql1)        
+        self.log.info("[END] {cn}.Calcute_UpDown(), exec TIME: {t} ms, stk_id: {id}".format(cn = type(self).__name__, t = p.executeTime(), id = stk_id))
+        return ls
+
+    '''
+    取出最後一筆計算過漲跌的資料
+    @param stk_id: 股票代碼
+    '''
+    def Get_Last_Updown(self, stk_id):
+        p = Profiler()
+        self.log.info("[START] {cn}.Get_Last_Updown(), stk_id: {id}".format(cn = type(self).__name__, id = stk_id))       
+        sql = "select * from tw_stock_quote where stk_id = '{id}' and updown is not null order by q_date desc limit 1".format(id = stk_id)
+        session = self.sessionFactory.GetSession()
+        rs = session.execute(sql).fetchone()
+        self.log.info("[END] {cn}.Get_Last_Updown(), exec TIME: {t} ms, stk_id: {id}".format(cn = type(self).__name__, t = p.executeTime(), id = stk_id)) 
+        return rs
 
 
     '''
@@ -97,8 +151,7 @@ class GGDDao:
     def Get_Noncalcute_EWMA(self, stk_id):
         p = Profiler()
         self.log.info("[START] {cn}.Get_Noncalcute_EWMA(), stk_id: {id}".format(cn = type(self).__name__), id = stk_id)
-        sql = "select * from tw_stock_quote where stk_id = '{id}' ewma is null"
-        sql = sql.format(id = stk_id)
+        sql = "select * from tw_stock_quote where stk_id = '{id}' ewma is null".format(id = stk_id)        
         session = self.sessionFactory.GetSession()
         ls = session.execute(sql)
         session.close()
@@ -112,8 +165,7 @@ class GGDDao:
     def Get_Last_EWMA(self, stk_id):
         p = Profiler()
         self.log.info("[START] {cn}.Get_Last_EWMA(), stk_id: {id}".format(cn = type(self).__name__, id = stk_id))
-        sql = "select * from tw_stock_quote where stk_id = '{id}' and ewma is not null order by q_date desc limit 1"
-        sql = sql.format(id = stk_id)
+        sql = "select * from tw_stock_quote where stk_id = '{id}' and ewma is not null order by q_date desc limit 1".format(id = stk_id)        
         session = self.sessionFactory.GetSession()
         rs = session.execute(sql).fetchone()
         session.close()
