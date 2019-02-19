@@ -169,9 +169,30 @@ class GGDDao:
         session = self.sessionFactory.GetSession()
         rs = session.execute(sql).fetchone()
         session.close()
-        self.log.info("[END] {cn}.Get_Last_EWMA(), ")
+        self.log.info("[END] {cn}.Get_Last_EWMA(), exec TIME: {t} ms, stk_id: {id}".format(cn = type(self).__name__, t = p.executeTime(), id = stk_id))
         return rs
-        
+    
+
+    '''
+    取出d日有漲/跌的證券商品
+    '''
+    def Get_up_Stk(self, d, up_or_down = 1):
+        p = Profiler()
+        self.log.info("[START] {cn}.Get_up_Stk(), date: '{date}', up_or_down: {u}".format(cn = type(self).__name__, date = d, u = up_or_down))
+        sql = ""
+        if 1 >= 0:
+            sql = "select * from tw_stock_quote where updown >= 0"
+        else:
+            sql = "select * from tw_stock_quote where updown < 0"
+        sql = sql + " and q_date = '{d}'"
+        sql = sql.format(d = d)
+        self.log.debug("sql: " + sql)
+        session = self.sessionFactory.GetSession()
+        rs = session.execute(sql)
+        session.close()
+        self.log.info("[END] {cn}.Get_up_Stk(), exec TIME: {t} ms, date: '{date}', up_or_down: {u}".format(cn = type(self).__name__, date = d, u = up_or_down, t = p.executeTime()))
+        return rs
+
         
 
     

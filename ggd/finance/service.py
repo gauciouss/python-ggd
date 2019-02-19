@@ -138,9 +138,26 @@ class FunctionalService:
             elif last_ewma["q_date"] == dt.datetime.now().strptime("%Y-%m-%d"):
                 self.log.debug("stk_id: {id}, quote_date: {qd} 已計算過 EWMA.".format(id = stk_id, qd = obj["quote"]))
                 continue                   
-                
+    
+    def Get_Up_Continue_Stk(self, d):
+        if d < 1:
+            return None
+        ls = []
+        date = dt.datetime.now()
+        for i in range(d):            
+            date = date + dt.timedelta(days = (0-i))
+            self.log.debug("date: " + date.strftime("%Y-%m-%d"))
+            rs = self.gdo.Get_up_Stk(date.strftime("%Y-%m-%d"))
+            t = []
+            for r in rs:
+                t.append(r)
 
-
-
-
-        
+            if len(ls) == 0:
+                ls = t                
+            else:
+                for r in ls:
+                    if r not in rs:
+                        ls.remove(r)
+                    
+        print(len(ls))
+        return ls
