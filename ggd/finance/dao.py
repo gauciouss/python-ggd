@@ -33,7 +33,7 @@ class GGDDao:
         session = None
         try:
             session = self.sessionFactory.GetSession()
-            #TODO 更新資料 
+            #更新資料 
             session.filter(key).update(value)
             session.commit()
         except Exception as e:
@@ -63,9 +63,9 @@ class GGDDao:
         p = Profiler()
         self.log.info("[START] {cname}.Get_Stock(), stk_id: {stk_id}".format(cname = type(self).__name__, stk_id = stk_id))
         
-        sql = "select distinct a.* from TW_STOCK_LIST a inner join tw_stock_quote b on a.STOCK_ID = b.stk_id"        
+        sql = "select distinct a.* from TW_STOCK_LIST a inner join tw_stock_quote b on a.STOCK_ID = b.stk_id where a.DELISTING_DATE is null "        
         if stk_id is not None:
-            sql = sql + (" where a.STOCK_ID = " + stk_id)
+            sql = sql + (" and a.STOCK_ID = " + stk_id)
         
         self.log.debug("exec sql statement: {sql}".format(sql = sql));
         session = self.sessionFactory.GetSession()
@@ -150,8 +150,8 @@ class GGDDao:
     '''
     def Get_Noncalcute_EWMA(self, stk_id):
         p = Profiler()
-        self.log.info("[START] {cn}.Get_Noncalcute_EWMA(), stk_id: {id}".format(cn = type(self).__name__), id = stk_id)
-        sql = "select * from tw_stock_quote where stk_id = '{id}' ewma is null".format(id = stk_id)        
+        self.log.info("[START] {cn}.Get_Noncalcute_EWMA(), stk_id: {id}".format(cn = type(self).__name__, id = stk_id))
+        sql = "select * from tw_stock_quote where stk_id = '{id}' and ewma is null order by q_date desc".format(id = stk_id)                
         session = self.sessionFactory.GetSession()
         ls = session.execute(sql)
         session.close()
@@ -171,6 +171,16 @@ class GGDDao:
         session.close()
         self.log.info("[END] {cn}.Get_Last_EWMA(), exec TIME: {t} ms, stk_id: {id}".format(cn = type(self).__name__, t = p.executeTime(), id = stk_id))
         return rs
+
+    def updateEWMA(self, stk_id, q_date, A, ewma):
+        p = Profiler()
+        self.log.info("[START] {cn}.updateEWMA(), stk_id: {id}, q_date: {d}, A: {A}, EWMA: {ewma}".format(cn = type(self).__name__, id = stk_id, d = q_date, A = A, ewma = ewma))
+        sql = "update tw_stock_quote set A = {A}, ewma = {ewma} where stk_id = '{s}' and q_date = '{d}'".format(A = A, ewma = ewma, s = stk_id, d = q_date)
+        session = self.sessionFactory.GetSession()
+        session.execute(sql)
+        session.commit()
+        session.close()
+        self.log.info("[end] {cn}.updateEWMA() exec TIME: {t} ms, stk_id: {id}, q_date: {d}, A: {A}, EWMA: {ewma}".format(cn = type(self).__name__, id = stk_id, d = q_date, A = A, ewma = ewma, t = p.executeTime()))
     
 
     '''
@@ -181,9 +191,9 @@ class GGDDao:
         self.log.info("[START] {cn}.Get_up_Stk(), date: '{date}', up_or_down: {u}".format(cn = type(self).__name__, date = d, u = up_or_down))
         sql = ""
         if 1 >= 0:
-            sql = "select * from tw_stock_quote where updown >= 0"
+            sql = "select * from tw_stock_quote where updown_limit >= 0"
         else:
-            sql = "select * from tw_stock_quote where updown < 0"
+            sql = "select * from tw_stock_quote where updown_limit < 0"
         sql = sql + " and q_date = '{d}'"
         sql = sql.format(d = d)
         self.log.debug("sql: " + sql)
@@ -193,6 +203,29 @@ class GGDDao:
         self.log.info("[END] {cn}.Get_up_Stk(), exec TIME: {t} ms, date: '{date}', up_or_down: {u}".format(cn = type(self).__name__, date = d, u = up_or_down, t = p.executeTime()))
         return rs
 
+    '''
+    取得商品基本檔&
+    '''
+    def Get_Stock_Info(self, stk_id):
+        p = Profiler()
+        self.log.info("[START] {cname}.Get_Stock_Info(), stk_id: {stk_id}".format(cname = type(self).__name__, stk_id = stk_id))
         
+        sql = """
+                select STOCK_ID, STOCK_NAME, NAME, q.close, q.q_date
+	                from TW_STOCK_LIST a 
+		            inner join TW_STOCK_INDUSTRY b on a.INDUSTRY = b.SERIAL_NO
+                    inner join (select stk_id, close, q_date from tw_stock_quote where stk_id = '{id}' order by q_date desc limit 1) q on a.STOCK_ID = q.stk_id   
+                    where a.STOCK_ID = '{id}'
+                    order by b.SERIAL_NO, a.STOCK_ID, close                
+	          """
+              
+        sql = sql.format(id = stk_id)
+        
+        self.log.debug("exec sql statement: {sql}".format(sql = sql));
+        session = self.sessionFactory.GetSession()
+        stk_list = session.execute(sql)
+        session.close()
+        self.log.info("[END] {cname}.Get_Stock_Info(), exec TIME: {t} ms., stk_no: {sn}".format(cname = type(self).__name__, t = p.executeTime(), sn = stk_id))
+        return stk_list
 
     

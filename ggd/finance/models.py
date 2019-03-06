@@ -82,3 +82,13 @@ class TwStkBuySellDaily(base):
     SELF_EMPLOYED_SELL_VOLUMN_RISK = Column(BIGINT)
     SELF_EMPLOYED_OVER_BUY_SELL_RISK = Column(BIGINT)
     TOTAL_OVER_BUY_SELL_VOLUMN = Column(BIGINT)
+
+class ExchangeDailyReport(base):
+    __table_args__ = {"extend_existing": True}
+    __tablename__ = "exchange_daily_report"
+    stk_id = Column(String(10), primary_key = True)
+    brokerId = Column(String(10), primary_key = True)
+    date = Column(Date, primary_key = True)
+    price = Column(Float)
+    buy_volumn = Column(BIGINT)
+    sell_volumn = Column(BIGINT)

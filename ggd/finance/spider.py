@@ -8,6 +8,7 @@ import traceback
 import time
 from ggd.util.ggdUtil import Profiler
 import sys
+import io
 
 class TWStockSummaryInfo:
 
@@ -177,7 +178,7 @@ class StockInfo:
         pass
 
     #取得買賣日報表
-    def GetExchangeDaily(self, callback):
+    def GetExchangeDaily(self, callback = None):
         req = requests.session()
         headers = {
             'User-Agent':'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/48.0.2564.116 Safari/537.36'
@@ -199,10 +200,43 @@ class StockInfo:
         payload['btnOK'] = '查詢'   
 
         res = req.post(self.EXCHANGE_DAILY_URL + '/bsMenu.aspx', data = payload, headers = headers) 
-        res = req.get(self.EXCHANGE_DAILY_URL + 'bsContent.aspx', headers = headers)
+        res = req.get(self.EXCHANGE_DAILY_URL + 'bsContent.aspx', headers = headers)        
         content = res.text        
-        logging.debug(content)
+        self.log.debug(content)
+        buf = io.StringIO(content)
+        
+
+        
+        i = 0
         rs = []
-        #TODO do data parser
-        callback(rs)
+        while True:
+            s = buf.readline()            
+            if s is not None and s != "":
+                if i > 2:
+                    #序號,券商,價格,買進股數,賣出股數,,序號,券商,價格,買進股數,賣出股數
+                    m = {}
+                    strs = s.split(",")
+                    if strs[0] != "":
+                        m["sn"] = strs[0]
+                        m["brokerId"] = strs[1]
+                        m["price"] = strs[2]
+                        m["buy_volumn"] = strs[3]
+                        m["sell_volumn"] = strs[4]
+                        rs.append(m)
+                    
+                    if strs[6] != "":
+                        m = {}
+                        m["sn"] = strs[6]
+                        m["brokerId"] = strs[7]
+                        m["price"] = strs[8]
+                        m["buy_volumn"] = strs[9]
+                        m["sell_volumn"] = strs[10]
+            else:
+                break
+            i = i+1
+        if callback is not None:
+            callback(rs)
+        else:
+            return rs
+
         

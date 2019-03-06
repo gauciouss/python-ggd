@@ -7,7 +7,7 @@ import datetime as dt
 import time
 import calendar
 import ggd.finance.dao
-from ggd.finance.models import TWStockQuote
+from ggd.finance.models import TWStockQuote, ExchangeDailyReport
 import sys
 
 class FunctionalService:
@@ -93,6 +93,7 @@ class FunctionalService:
             
             self.gdo.saveBeans(beans)
             self.Calcute_UpDown(sid)
+            self.EWMA(sid)
 
         self.log.info("[END] {cn}.ReverseQuote(), exec TIME: {t} ms, stk_id: {sn}".format(cn = type(self).__name__, t = p.executeTime(), sn = stk_id))
 
@@ -102,20 +103,18 @@ class FunctionalService:
     '''
     def Calcute_UpDown(self, stk_id):        
         p = Profiler()
-        self.log.info("[START] {cn}.UP_DOWN(), stk_id: {id}".format(cn = type(self).__name__, id = stk_id))
+        self.log.info("[START] {cn}.Calcute_UpDown(), stk_id: {id}".format(cn = type(self).__name__, id = stk_id))
         #取出未計算漲跌的資料
         ls = self.gdo.Get_Uncalcute_Updown(stk_id)  
         #取出最後一筆有計算漲跌的資料      
-        updwonObj = self.gdo.Get_Last_Updown(stk_id)
-        close = updwonObj["close"]
+        updownObj = self.gdo.Get_Last_Updown(stk_id)        
+        close = updownObj["close"]
         for obj in ls:
             distance = obj["close"] - close
-            updown = round(distance, 2)
+            updown = distance
             updown_limit = round((distance / close) * 100, 2)
-
-
-            self.log.debug("stk_id: {id}, q_date: {qd}, updown: {upd}, updown_limit: {updl}".format(id = stk_id, qd = obj["q_date"], upd = updown, updl = updown_limit))            
-            #self.gdo.updateBeans({"stk_id": stk_id, "q_date": obj["q_date"].strftime("%Y-%m-%d")}, {"updown": updown, "updown_limit": updown_limit})
+            self.log.debug("stk_id: {id}, q_date: {qd}, updown: {upd}, updown_limit: {updl}".format(id = stk_id, qd = obj["q_date"], upd = updown, updl = updown_limit))
+            
             self.gdo.update_updown_value(
                 stk_id = stk_id,
                 q_date = obj["q_date"].strftime("%Y-%m-%d"),
@@ -124,40 +123,89 @@ class FunctionalService:
             )
             close = obj["close"]
 
-        self.log.info("[END] {cn}.UP_DOWN(), exec TIME: {t} ms, stk_id: {id}".format(cn = type(self).__name__, id = stk_id, t = p.executeTime()))        
+        self.log.info("[END] {cn}.Calcute_UpDown(), exec TIME: {t} ms, stk_id: {id}".format(cn = type(self).__name__, id = stk_id, t = p.executeTime()))        
 
-    #計算ewma
-    def EWMA(self, stk_id, q_date, up):
+    '''
+    計算ewma
+    @param stk_id 股票代碼
+    '''
+    def EWMA(self, stk_id):
         p = Profiler()
         self.log.info("[START] {cn}.EWMA(), stk_id: {sn}".format(cn = type(self).__name__, sn = stk_id))
-        ls = self.gdo.Get_Noncalcute_EWMA(stk_id)
-        for obj in ls:            
-            last_quote_obj = self.gdo.Get_Last_EWMA(stk_id)
-            if last_ewma is None:
-                continue
-            elif last_ewma["q_date"] == dt.datetime.now().strptime("%Y-%m-%d"):
-                self.log.debug("stk_id: {id}, quote_date: {qd} 已計算過 EWMA.".format(id = stk_id, qd = obj["quote"]))
-                continue                   
+                
+        last_quote_obj = self.gdo.Get_Last_EWMA(stk_id)        
+        Ay = last_quote_obj["A"]
+        lambdaa = 0.06
+        ls = self.gdo.Get_Noncalcute_EWMA(stk_id)                   
+        for obj in ls:
+            r = obj["updown_limit"]
+            Ai = round(pow(r, 2) * lambdaa + Ay * (1-lambdaa), 2)
+            ewma = round(pow(Ai*250, 0.5), 2)
+            self.gdo.updateEWMA(stk_id, obj["q_date"], Ai, ewma)
+
+    '''
+    取得每日買賣日報表
+    '''
+    def GetExchangeDailyReport(self, stk_id):
+        p = Profiler()
+        self.log.info("[START] {cn}.GetExchangeDailyReport(), stk_id: {id}".format(cn = type(self).__name__, id = stk_id))
+        stk_spider = StockInfo(stk_id)
+        #TODO insert data into table
+        rs = stk_spider.GetExchangeDaily()
+        beans = []
+        for r in rs:            
+            m = ExchangeDailyReport(
+                stk_id = stk_id,
+                brokerId = r["brokerId"],
+                price = float(r["price"]),
+                buy_volumn = int(r["buy_volumn"]),
+                sell_volumn = int(r["sell_volumn"]),
+                date = '2019/03/06' 
+            )            
+            beans.append(m)            
+        self.gdo.saveBeans(beans)
+        self.log.info("[END] {cn}.GetExchangeDailyReport(), exec TIME: {t} ms, stk_id: {id}".format(cn = type(self).__name__, id = stk_id, t = p.executeTime()))
+        
+
+                            
     
+    '''
+    取得連漲d天的股票
+    '''
     def Get_Up_Continue_Stk(self, d):
         if d < 1:
             return None
+        d = d +1
         ls = []
         date = dt.datetime.now()
-        for i in range(d):            
-            date = date + dt.timedelta(days = (0-i))
-            self.log.debug("date: " + date.strftime("%Y-%m-%d"))
-            rs = self.gdo.Get_up_Stk(date.strftime("%Y-%m-%d"))
+        for i in range(d):                   
+            date = date + dt.timedelta(days = -1)
+            str_date = date.strftime("%Y-%m-%d")
+            self.log.debug("date: " + str_date)
+            rs = self.gdo.Get_up_Stk(str_date)
             t = []
             for r in rs:
                 t.append(r)
 
             if len(ls) == 0:
                 ls = t                
-            else:
+            else:                                
                 for r in ls:
                     if r not in rs:
-                        ls.remove(r)
-                    
-        print(len(ls))
-        return ls
+                        ls.remove(r)        
+
+
+        rs = []
+        for obj in ls:
+            stk_id = obj[0]
+            stkObj = self.gdo.Get_Stock_Info(stk_id).fetchone()
+            _stk = {
+                "id": stk_id,
+                "stk_name": stkObj[1],
+                "industry_name": stkObj[2],
+                "close": stkObj.close,
+                "url": "http://newjust.masterlink.com.tw/z/zc/zcw/zcw1ChgPage_"+ stk_id +".djhtm"                
+            }
+            rs.append(_stk)
+
+        return rs
