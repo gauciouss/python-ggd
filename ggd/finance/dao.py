@@ -43,6 +43,10 @@ class GGDDao:
 
         self.log.info("[END] {cn}.updateBeans(), exec TIME: {t} ms.".format(cn = type(self).__name__, t = p.executeTime()))
 
+    
+    '''
+    更新漲跌/漲跌幅
+    '''
     def update_updown_value(self, stk_id, q_date, updown, updown_limit):
         p = Profiler()
         self.log.info("[START] {cn}.update_updown_value(), stk_id: {id}, q_date: {qd}, updown: {u}, updown_limit: {ul}".format(cn = type(self).__name__, id = stk_id, qd = q_date, u = updown,  ul = updown_limit))
@@ -61,9 +65,10 @@ class GGDDao:
     '''
     def Get_Stock(self, stk_id = None):
         p = Profiler()
-        self.log.info("[START] {cname}.Get_Stock(), stk_id: {stk_id}".format(cname = type(self).__name__, stk_id = stk_id))
+        #self.log.info("[START] {cname}.Get_Stock(), stk_id: {stk_id}".format(cname = type(self).__name__, stk_id = stk_id))
+        self.log.info(p.startLog("stk_id: {}", stk_id))
         
-        sql = "select distinct a.* from TW_STOCK_LIST a inner join tw_stock_quote b on a.STOCK_ID = b.stk_id where a.DELISTING_DATE is null "        
+        sql = "select distinct a.* from TW_STOCK_LIST a left join tw_stock_quote b on a.STOCK_ID = b.stk_id where a.DELISTING_DATE is null "        
         if stk_id is not None:
             sql = sql + (" and a.STOCK_ID = " + stk_id)
         
@@ -71,7 +76,8 @@ class GGDDao:
         session = self.sessionFactory.GetSession()
         stk_list = session.execute(sql)
         session.close()
-        self.log.info("[END] {cname}.Get_Stock(), exec TIME: {t} ms., stk_no: {sn}".format(cname = type(self).__name__, t = p.executeTime(), sn = stk_id))
+        #self.log.info("[END] {cname}.Get_Stock(), exec TIME: {t} ms., stk_no: {sn}".format(cname = type(self).__name__, t = p.executeTime(), sn = stk_id))
+        self.log.info(p.endLog("stk_id: {}", stk_id))
         return stk_list
 
     
@@ -190,7 +196,7 @@ class GGDDao:
         p = Profiler()
         self.log.info("[START] {cn}.Get_up_Stk(), date: '{date}', up_or_down: {u}".format(cn = type(self).__name__, date = d, u = up_or_down))
         sql = ""
-        if 1 >= 0:
+        if up_or_down >= 0:
             sql = "select * from tw_stock_quote where updown_limit >= 0"
         else:
             sql = "select * from tw_stock_quote where updown_limit < 0"
@@ -228,4 +234,16 @@ class GGDDao:
         self.log.info("[END] {cname}.Get_Stock_Info(), exec TIME: {t} ms., stk_no: {sn}".format(cname = type(self).__name__, t = p.executeTime(), sn = stk_id))
         return stk_list
 
+
+    def Save_Daily_Exchange(self, a, b, c, d, e, f, g, h, i, j):
+        p = Profiler()
+        self.log.info(p.startLog("商品代碼: {}, 交易日期: {}, 券商代碼: {}, 券商名稱: {}, 買量: {}, 賣量: {}, 買價: {}, 賣價: {}, 買賣超: {}, 均價: {}", a, b, c, d, e, f, g, h, i, j))
+        sql = "insert into tw_stock_daily_exchange (stk_id, date, company_id, company_name, buy_quantity, sell_quantity, buy_price, sell_price, over_quantity, avg_price) values ('{a}', '{b}', '{c}', '{d}', '{e}', '{f}', '{g}', '{h}', '{i}', '{j}')"
+        sql = sql.format(a = a, b=b, c = c, d = d, e = e, f = f, g = g, h = h, i = i, j = j)
+        session = self.sessionFactory.GetSession()
+        session.execute(sql)
+        session.commit()
+        session.close()
+        self.log.info(p.endLog("商品代碼: {}, 交易日期: {}, 券商代碼: {}, 券商名稱: {}, 買量: {}, 賣量: {}, 買價: {}, 賣價: {}, 買賣超: {}, 均價: {}", a, b, c, d, e, f, g, h, i, j))
+        pass
     
