@@ -9,6 +9,7 @@ import time
 from ggd.util.ggdUtil import Profiler
 import sys
 import io
+import json
 
 class TWStockSummaryInfo:
 
@@ -67,7 +68,7 @@ class StockInfo:
     stock_no = ''
 
     #抓報價時，若被擋的話，重複的次數
-    MAX_REPEAT_TIMES = 5
+    MAX_REPEAT_TIMES = 2
     
     #買賣日報表連結
     EXCHANGE_DAILY_URL = 'http://bsr.twse.com.tw/bshtm/'
@@ -177,7 +178,7 @@ class StockInfo:
                     return None, None
         pass
 
-    #取得買賣日報表
+    #取得買賣日報表(交易所)
     def GetExchangeDaily(self, callback = None):
         req = requests.session()
         headers = {
@@ -238,5 +239,35 @@ class StockInfo:
             callback(rs)
         else:
             return rs
+
+    
+
+
+    def GetExangeDailyFromWantgoo(self, d, cb = None):
+        p = Profiler()
+        self.log.info(p.startLog("date: {}", d))
+        if d is None:
+            d = datetime.datetime.now().strftime("%Y-%m-%d")
+        url = "https://www.wantgoo.com/stock/astock/agentstat_ajax?StockNo={id}&Types=3.5&StartDate={ds}&EndDate={de}&Rows=35"
+        url = url.format(id=self.stock_no, ds = d, de = d)
+        self.log.debug("get wantgoo daily exchange url: " + url)
+        resp = requests.get(url)
+        dailyReport = resp.json()
+        code = dailyReport["code"]
+        message = dailyReport["message"]
+        returnValues = json.loads(dailyReport["returnValues"])
+        if cb is not None:
+            cb(returnValues)
+        else:
+            return returnValues
+       
+
+
+            
+            
+            
+        
+
+
 
         
