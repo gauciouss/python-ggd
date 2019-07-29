@@ -52,9 +52,9 @@ class FunctionalService:
                     start = fo["q_date"] + dt.timedelta(days=1)
                 
                 if start is None:
-                    continue
-                #要確定盤後才可以抓取
-                self.log.info("stk: {s} >> {d} 已抓取過盤後資料，往下一檔前進".format(s = sid, d = start))
+                    #要確定盤後才可以抓取
+                    self.log.info("stk: {s} >> {d} 已抓取過盤後資料，往下一檔前進".format(s = sid, d = start))
+                    continue                
                 d1 = dt.datetime.combine(start, dt.time())
                 d2 = dt.datetime.now().replace(hour = 16, minute = 0, second = 0)     
 
@@ -92,8 +92,8 @@ class FunctionalService:
                     beans.append(bean)
             
             self.gdo.saveBeans(beans)
-            self.Calcute_UpDown(sid)
-            self.EWMA(sid)
+            #self.Calcute_UpDown(sid)
+            #self.EWMA(sid)
 
         self.log.info("[END] {cn}.ReverseQuote(), exec TIME: {t} ms, stk_id: {sn}".format(cn = type(self).__name__, t = p.executeTime(), sn = stk_id))
 
@@ -103,7 +103,8 @@ class FunctionalService:
     '''
     def Calcute_UpDown(self, stk_id):        
         p = Profiler()
-        self.log.info("[START] {cn}.Calcute_UpDown(), stk_id: {id}".format(cn = type(self).__name__, id = stk_id))
+        #self.log.info("[START] {cn}.Calcute_UpDown(), stk_id: {id}".format(cn = type(self).__name__, id = stk_id))
+        self.log.info(p.startLog("stk_id: {}", stk_id))
         #取出未計算漲跌的資料
         ls = self.gdo.Get_Uncalcute_Updown(stk_id)  
         #取出最後一筆有計算漲跌的資料      
@@ -123,7 +124,8 @@ class FunctionalService:
             )
             close = obj["close"]
 
-        self.log.info("[END] {cn}.Calcute_UpDown(), exec TIME: {t} ms, stk_id: {id}".format(cn = type(self).__name__, id = stk_id, t = p.executeTime()))        
+        #self.log.info("[END] {cn}.Calcute_UpDown(), exec TIME: {t} ms, stk_id: {id}".format(cn = type(self).__name__, id = stk_id, t = p.executeTime()))        
+        self.log.info(p.endLog("stk_id: {}", stk_id))
 
     '''
     計算ewma
@@ -131,7 +133,8 @@ class FunctionalService:
     '''
     def EWMA(self, stk_id):
         p = Profiler()
-        self.log.info("[START] {cn}.EWMA(), stk_id: {sn}".format(cn = type(self).__name__, sn = stk_id))
+        #self.log.info("[START] {cn}.EWMA(), stk_id: {sn}".format(cn = type(self).__name__, sn = stk_id))
+        self.log.info(p.startLog("stk_id: {}", stk_id))
                 
         last_quote_obj = self.gdo.Get_Last_EWMA(stk_id)        
         Ay = last_quote_obj["A"]
@@ -142,28 +145,43 @@ class FunctionalService:
             Ai = round(pow(r, 2) * lambdaa + Ay * (1-lambdaa), 2)
             ewma = round(pow(Ai*250, 0.5), 2)
             self.gdo.updateEWMA(stk_id, obj["q_date"], Ai, ewma)
+        
+        self.log.info(p.endLog("stk_id: {}", stk_id))
 
     '''
     取得每日買賣日報表
     '''
-    def GetExchangeDailyReport(self, stk_id):
+    def GetExchangeDailyReport(self, stk_id, date):
         p = Profiler()
         self.log.info("[START] {cn}.GetExchangeDailyReport(), stk_id: {id}".format(cn = type(self).__name__, id = stk_id))
         stk_spider = StockInfo(stk_id)
-        #TODO insert data into table
-        rs = stk_spider.GetExchangeDaily()
-        beans = []
-        for r in rs:            
-            m = ExchangeDailyReport(
-                stk_id = stk_id,
-                brokerId = r["brokerId"],
-                price = float(r["price"]),
-                buy_volumn = int(r["buy_volumn"]),
-                sell_volumn = int(r["sell_volumn"]),
-                date = '2019/03/06' 
-            )            
-            beans.append(m)            
-        self.gdo.saveBeans(beans)
+        rs = stk_spider.GetExangeDailyFromWantgoo(date)
+        for r in rs:
+            c1 = r["券商名稱"]
+            bq1 = r["買量"]
+            sq1 = r["賣量"]
+            bp1 = r["買價"]
+            sp1 = r["賣價"]            
+            overbs1 = r["買賣超"]
+            avg1 = r["均價"]
+
+            c2 = r["券商名稱2"]
+            bq1 = r["買量2"]
+            sq1 = r["賣量2"]
+            bp2 = r["買價2"]
+            sp2 = r["賣價2"]
+            overbs2 = r["買賣超2"]
+            avg2 = r["均價2"]
+            
+            if c1 is not None:                
+                id = c1[-5:-1]
+                name = c1[:(len(c1) - 6)]
+                print("c1: " + c1 +", id: " + id + ", name: " + name)
+                #TODO
+
+
+                
+
         self.log.info("[END] {cn}.GetExchangeDailyReport(), exec TIME: {t} ms, stk_id: {id}".format(cn = type(self).__name__, id = stk_id, t = p.executeTime()))
         
 
@@ -175,24 +193,27 @@ class FunctionalService:
     def Get_Up_Continue_Stk(self, d):
         if d < 1:
             return None
-        d = d +1
+        d = d + 1
         ls = []
         date = dt.datetime.now()
-        for i in range(d):                   
-            date = date + dt.timedelta(days = -1)
+        #for i in range(1, d):               
+        while d > 0:
             str_date = date.strftime("%Y-%m-%d")
             self.log.debug("date: " + str_date)
             rs = self.gdo.Get_up_Stk(str_date)
-            t = []
-            for r in rs:
-                t.append(r)
-
+            
             if len(ls) == 0:
-                ls = t                
-            else:                                
-                for r in ls:
-                    if r not in rs:
-                        ls.remove(r)        
+                for obj in rs:
+                    ls.append(obj)
+            else:
+                for obj in ls:                    
+                    if obj not in rs:                        
+                        ls.remove(obj)                        
+
+            if len(ls) != 0:
+                d = d - 1
+
+            date = date + dt.timedelta(days = -1)               
 
 
         rs = []
