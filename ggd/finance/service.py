@@ -91,9 +91,7 @@ class FunctionalService:
                     preDate = quote_date
                     beans.append(bean)
             
-            self.gdo.saveBeans(beans)
-            #self.Calcute_UpDown(sid)
-            #self.EWMA(sid)
+            self.gdo.saveBeans(beans)            
 
         self.log.info("[END] {cn}.ReverseQuote(), exec TIME: {t} ms, stk_id: {sn}".format(cn = type(self).__name__, t = p.executeTime(), sn = stk_id))
 
@@ -151,11 +149,11 @@ class FunctionalService:
     '''
     取得每日買賣日報表
     '''
-    def GetExchangeDailyReport(self, stk_id, date):
+    def GetExchangeDailyReport(self, stk_id, d):
         p = Profiler()
-        self.log.info("[START] {cn}.GetExchangeDailyReport(), stk_id: {id}".format(cn = type(self).__name__, id = stk_id))
+        self.log.info(p.startLog("商品代碼: {}, 交易日期", stk_id, d))
         stk_spider = StockInfo(stk_id)
-        rs = stk_spider.GetExangeDailyFromWantgoo(date)
+        rs = stk_spider.GetExangeDailyFromWantgoo(d)
         for r in rs:
             c1 = r["券商名稱"]
             bq1 = r["買量"]
@@ -177,12 +175,11 @@ class FunctionalService:
                 id = c1[-5:-1]
                 name = c1[:(len(c1) - 6)]
                 print("c1: " + c1 +", id: " + id + ", name: " + name)
-                #TODO
+                self.gdo.Save_Daily_Exchange(stk_id, d, id, name, bq1, sq1, bp1, sp1, overbs1, avg1)
 
+        self.log.info(p.endLog("商品代碼: {}, 交易日期", stk_id, d))        
 
-                
-
-        self.log.info("[END] {cn}.GetExchangeDailyReport(), exec TIME: {t} ms, stk_id: {id}".format(cn = type(self).__name__, id = stk_id, t = p.executeTime()))
+        
         
 
                             
@@ -213,9 +210,7 @@ class FunctionalService:
             if len(ls) != 0:
                 d = d - 1
 
-            date = date + dt.timedelta(days = -1)               
-
-
+            date = date + dt.timedelta(days = -1)
         rs = []
         for obj in ls:
             stk_id = obj[0]
