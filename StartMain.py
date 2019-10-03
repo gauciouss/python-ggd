@@ -33,43 +33,56 @@ cmd = sys.argv[1]
 
 p = Profiler()
 log.info("cmd: " + cmd)
+
+
+dao = TWStockDao()
+if dao.isHoliday() is True:
+    log.info("今日為假日，不執行")
+    cmd = -1
+
+
+
+
 if cmd == "1":
     log.info("開始執行回補")
-    stk_id = sys.argv[2] if len(sys.argv) >= 3 else ""
+
+    stk_id = sys.argv[2] if len(sys.argv) >= 3 else ""    
+    _d = sys.argv[3] if len(sys.argv) >= 4 else dt.now().strftime("%Y%m%d")    
+    
+    dao = TWStockDao()
     if stk_id == "":
         log.info("未輸入symbol id，執行全商品回補")
-        dao = TWStockDao()
+        
         rs = dao.Get_All_Stocks()
         for r in rs:
             stk_id = r.STOCK_ID
             tws = TWStockModule(stk_id)
             tws.RevertQuote()
+            change, cLimit = dao.Get_Compute_Change_Pricing(stk_id)
+            if change is not None and cLimit is not None:
+                dao.Update_Updown_Value(stk_id, _d, change, cLimit)
+        
     else:
+        log.info("symbol id: {id}，執行回補".format(id = stk_id))
         tws = TWStockModule(stk_id)
-        tws.RevertQuote()    
+        tws.RevertQuote()        
+        change, cLimit = dao.Get_Compute_Change_Pricing(stk_id, _d)
+        if change is not None and cLimit is not None:
+            dao.Update_Updown_Value(stk_id, _d, change, cLimit)
+
 elif cmd == "2":
-    log.info("開始計算漲跌, ewma")
-    dao = TWStockDao()
-    rs = dao.Get_All_Stocks()
-    #service = FunctionalService(dao)
-    #for stk in rs:
-    #    service.Calcute_UpDown(stk["STOCK_ID"])
-    #    service.EWMA(stk["STOCK_ID"])
-    #TODO
+    stk_id = sys.argv[2] if len(sys.argv) >= 3 else ""    
+    _d = sys.argv[3] if len(sys.argv) >= 4 else dt.now().strftime("%Y%m%d")    
+    change, cLimit = dao.Get_Compute_Change_Pricing(stk_id, _d)
+    print("change: " + str(change) + ", cLimit: " + str(cLimit))
+
 elif cmd == "3":
-    log.info("開始取得買賣日報表")
-    d = sys.argv[2] if len(sys.argv) >= 3 else dt.now().strftime("%Y%m%d")
-    stk_id = sys.argv[3] if len(sys.argv) >= 4 else ""
+    log.info("開始取得買賣日報表")    
+    stk_id = sys.argv[2] if len(sys.argv) >= 3 else ""
+    d = sys.argv[3] if len(sys.argv) >= 4 else dt.now().strftime("%Y%m%d")
+    d2 = sys.argv[4] if len(sys.argv) >= 5 else d
     dao = TWStockDao()
-    
-    if stk_id == "":        
-        rs = dao.Get_All_Stocks()
-        for r in rs:
-            module = TWStockModule(r.STOCK_ID)
-            module.GetExangeDailyFromWantgoo(d)
-    else:
-        module = TWStockModule(stk_id)
-        rs = module.GetExangeDailyFromWantgoo(d)
+    def save(stk_id, d, rs):
         for r in rs:
             c1 = r["券商名稱"]
             bq1 = r["買量"]
@@ -96,14 +109,50 @@ elif cmd == "3":
                 id = c2[-5:-1]
                 name = c2[:(len(c2) - 6)]                
                 dao.Save_Daily_Exchange(stk_id, d, id, name, bq2, sq2, bp2, sp2, overbs2, avg2) 
+
+    def saveSummary(stk_id, d, rs):
+        for r in rs:
+            buySum = r["買超總計"]
+            sellSum = r["賣超總計"]
+            message = r["主力方向"]
+            rate = r["比率"]
+            dao.SaveDailyExchangeSummary(stk_id, d, buySum, sellSum, rate, message)
+    
+    def isHoliday(dn):
+        ds = dt.strptime(str(dn), "%Y%m%d")
+        return True if ds == 5 or ds == 6 else False
+    
+    for dd in range(int(d2) -int(d) + 1):
+        dn = int(d) + dd
+        if(isHoliday(dn) is False):
+            if stk_id == "":        
+                rs = dao.Get_All_Stocks()
+                for r in rs:
+                    module = TWStockModule(r.STOCK_ID)
+                    rs = module.GetExangeDailyFromWantgoo(d)            
+                    save(r.STOCK_ID, dn, rs)
+                    rvs = module.GetExchangeDailySummaryFromWantgoo(d)
+                    saveSummary(r.STOCK_ID, d, rvs)
+            else:
+                module = TWStockModule(stk_id)
+                rs = module.GetExangeDailyFromWantgoo(d)
+                save(stk_id, dn, rs)
+                rvs = module.GetExchangeDailySummaryFromWantgoo(d)
+                saveSummary(stk_id, d, rvs)
+        
 elif cmd == "4":
     log.info("開始取得當年度休市日")
     dao = TWStockDao()    
     year = dt.now().year
-    year = year - 1911 #轉成明國年
+    year = year - 1911 #轉成民國年
     dao.SaveHoliday(year)
     
-    
+elif cmd == "5":
+    log.info("取得產業分類表")    
+    module = TWStockModule()
+    module.GetCategoryStock()
 
+
+    
 
 log.info("cmd: " + cmd + " 執行結束，共花費: "+ str(p.executeTime()) + " ms.")
