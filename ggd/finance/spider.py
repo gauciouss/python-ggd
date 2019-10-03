@@ -242,12 +242,14 @@ class StockInfo:
 
     
 
-
+    '''
+    取得每日買賣日報表
+    '''
     def GetExangeDailyFromWantgoo(self, d, cb = None):
         p = Profiler()
         self.log.info(p.startLog("date: {}", d))
         if d is None:
-            d = datetime.datetime.now().strftime("%Y-%m-%d")
+            d = datetime.datetime.now().strftime("%Y%m%d")
         url = "https://www.wantgoo.com/stock/astock/agentstat_ajax?StockNo={id}&Types=3.5&StartDate={ds}&EndDate={de}&Rows=35"
         url = url.format(id=self.stock_no, ds = d, de = d)
         self.log.debug("get wantgoo daily exchange url: " + url)
@@ -260,6 +262,14 @@ class StockInfo:
             cb(returnValues)
         else:
             return returnValues
+
+    def GetExangeDailySummaryFromWantgoo(self, d, cb = None):
+        p = Profiler()
+        url = "https://www.wantgoo.com/stock/astock/agentstat_total_ajax?StockNo={id}&StartDate={d}&EndDate={d}&Rows=35"
+        self.log.info(p.startLog("date: {}", d))
+        if d is None:
+            d = datetime.datetime.now().strftime("%Y%m%d")
+        
        
 
 

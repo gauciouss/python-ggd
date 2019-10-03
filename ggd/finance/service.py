@@ -122,9 +122,7 @@ class FunctionalService:
                 updown = updown,
                 updown_limit = updown_limit
             )
-            close = obj["close"]
-
-        #self.log.info("[END] {cn}.Calcute_UpDown(), exec TIME: {t} ms, stk_id: {id}".format(cn = type(self).__name__, id = stk_id, t = p.executeTime()))        
+            close = obj["close"]        
         self.log.info(p.endLog("stk_id: {}", stk_id))
 
     '''
@@ -132,8 +130,7 @@ class FunctionalService:
     @param stk_id 股票代碼
     '''
     def EWMA(self, stk_id):
-        p = Profiler()
-        #self.log.info("[START] {cn}.EWMA(), stk_id: {sn}".format(cn = type(self).__name__, sn = stk_id))
+        p = Profiler()        
         self.log.info(p.startLog("stk_id: {}", stk_id))
                 
         last_quote_obj = self.gdo.Get_Last_EWMA(stk_id)        
@@ -166,8 +163,8 @@ class FunctionalService:
             avg1 = r["均價"]
 
             c2 = r["券商名稱2"]
-            bq1 = r["買量2"]
-            sq1 = r["賣量2"]
+            bq2 = r["買量2"]
+            sq2 = r["賣量2"]
             bp2 = r["買價2"]
             sp2 = r["賣價2"]
             overbs2 = r["買賣超2"]
@@ -175,12 +172,13 @@ class FunctionalService:
             
             if c1 is not None:                
                 id = c1[-5:-1]
-                name = c1[:(len(c1) - 6)]
-                print("c1: " + c1 +", id: " + id + ", name: " + name)
-                #TODO
-
-
-                
+                name = c1[:(len(c1) - 6)]                
+                self.gdo.Save_Daily_Exchange(stk_id, date, id, name, bq1, sq1, bp1, sp1, overbs1, avg1)
+            
+            if c2 is not None:
+                id = c2[-5:-1]
+                name = c2[:(len(c2) - 6)]                
+                self.gdo.Save_Daily_Exchange(stk_id, date, id, name, bq2, sq2, bp2, sp2, overbs2, avg2)
 
         self.log.info("[END] {cn}.GetExchangeDailyReport(), exec TIME: {t} ms, stk_id: {id}".format(cn = type(self).__name__, id = stk_id, t = p.executeTime()))
         
