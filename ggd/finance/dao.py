@@ -234,7 +234,9 @@ class GGDDao:
         self.log.info("[END] {cname}.Get_Stock_Info(), exec TIME: {t} ms., stk_no: {sn}".format(cname = type(self).__name__, t = p.executeTime(), sn = stk_id))
         return stk_list
 
-
+    '''
+    儲存買賣日報表
+    '''
     def Save_Daily_Exchange(self, a, b, c, d, e, f, g, h, i, j):
         p = Profiler()
         self.log.info(p.startLog("商品代碼: {}, 交易日期: {}, 券商代碼: {}, 券商名稱: {}, 買量: {}, 賣量: {}, 買價: {}, 賣價: {}, 買賣超: {}, 均價: {}", a, b, c, d, e, f, g, h, i, j))
